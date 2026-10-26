@@ -1,1283 +1,624 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>학교 특별실 예약 관리 시스템</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-        * {
-            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>학교 특별실 예약 관리 시스템</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+* { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; }
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+</style>
+<style type="text/tailwindcss">
+.inp { @apply w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none; }
+.sm-inp { @apply w-full bg-white border border-slate-300 rounded-lg p-2 text-xs; }
+.lbl { @apply block text-xs font-semibold text-slate-600 mb-1; }
+.modal { @apply fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4; }
+.mbox { @apply bg-white rounded-2xl w-full shadow-2xl border border-slate-100 overflow-hidden; }
+.mhead { @apply bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center; }
+.mtitle { @apply font-bold text-slate-800 text-base; }
+.msub { @apply text-xs text-slate-500; }
+.xbtn { @apply text-slate-400 hover:text-slate-600 p-1 rounded-lg; }
+.hbtn { @apply p-2 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium; }
+</style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-    <!-- CONFIGURATION SCRIPT (Pre-configured Google Apps Script URL) -->
-    <script>
-        // ==========================================================================
-        // 기본 구글 시트 API URL (전체 선생님 자동 연동용)
-        // ==========================================================================
-        const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbyrL11OApMpJ1ns8CidiZKy_d2b4TwxDdqUnwbQooVzVGRGLjBstk5rKcIjH5EnJHM8_A/exec";
-    </script>
+<script>
+// 구글 앱스 스크립트 웹앱 URL (배포 > 배포 관리에서 확인한 /exec 주소)
+const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbyrL11OApMpJ1ns8CidiZKy_d2b4TwxDdqUnwbQooVzVGRGLjBstk5rKcIjH5EnJHM8_A/exec";
+</script>
 
-    <!-- Top Header Navigation -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <!-- Logo & Title -->
-                <div class="flex items-center space-x-3">
-                    <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-200">
-                        <i data-lucide="door-open" class="w-6 h-6"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-lg font-bold text-slate-900 tracking-tight leading-tight">학교 특별실 예약 시스템</h1>
-                        <p class="text-xs text-slate-500 hidden sm:block">스마트한 교실 공유 & 시간표 관리</p>
-                    </div>
-                </div>
-
-                <!-- Controls & Actions -->
-                <div class="flex items-center space-x-2 sm:space-x-3">
-                    <!-- Data Sync Status Badge -->
-                    <div id="syncStatusBadge" class="hidden sm:flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <span id="syncStatusText">구글 시트 연동 완료</span>
-                    </div>
-
-                    <!-- Search Button -->
-                    <button onclick="openSearchModal()" class="p-2 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium">
-                        <i data-lucide="search" class="w-4 h-4"></i>
-                        <span class="hidden md:inline">예약 검색</span>
-                    </button>
-
-                    <!-- Fixed Timetable Manager Button -->
-                    <button onclick="openFixedScheduleModal()" class="p-2 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-medium">
-                        <i data-lucide="calendar-check-2" class="w-4 h-4"></i>
-                        <span class="hidden md:inline">고정 시간표 설정</span>
-                    </button>
-
-                    <!-- Settings Button -->
-                    <button onclick="openSettingsModal()" class="p-2 text-slate-600 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors" title="시스템 설정 및 구글 시트 정보">
-                        <i data-lucide="settings" class="w-5 h-5"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Content Container -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 space-y-5">
-
-        <!-- Top Bar: Room Selector & Date Control -->
-        <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
-            
-            <!-- Room Selection Dropdown & Info Badge -->
-            <div class="flex items-center space-x-3">
-                <label for="roomSelect" class="text-sm font-semibold text-slate-700 flex items-center gap-1.5 whitespace-nowrap">
-                    <i data-lucide="building-2" class="w-4 h-4 text-indigo-600"></i>
-                    특별실 선택:
-                </label>
-                <select id="roomSelect" onchange="handleRoomChange()" class="w-full md:w-64 bg-slate-50 border border-slate-300 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 p-2.5 font-semibold transition-all">
-                    <!-- JS populate rooms -->
-                </select>
-                <button onclick="openRoomManagementModal()" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition" title="특별실 목록 관리 (추가/수정/삭제)">
-                    <i data-lucide="plus-circle" class="w-5 h-5"></i>
-                </button>
-            </div>
-
-            <!-- Date Controls & View Switcher -->
-            <div class="flex items-center justify-between md:justify-end space-x-2 sm:space-x-4">
-                <!-- Navigation (Prev, Today, Next) -->
-                <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl">
-                    <button onclick="navigateDate(-1)" class="p-1.5 text-slate-600 hover:bg-white hover:shadow-xs rounded-lg transition">
-                        <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                    </button>
-                    <button onclick="navigateToday()" class="px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-white hover:shadow-xs rounded-lg transition">
-                        오늘
-                    </button>
-                    <button onclick="navigateDate(1)" class="p-1.5 text-slate-600 hover:bg-white hover:shadow-xs rounded-lg transition">
-                        <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                    </button>
-                </div>
-
-                <!-- Date Range Display -->
-                <div id="currentDateDisplay" class="text-base font-bold text-slate-800 min-w-[140px] text-center">
-                    2026년 10월
-                </div>
-
-                <!-- View Type Toggle (Weekly / Daily) -->
-                <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold">
-                    <button id="viewWeeklyBtn" onclick="switchView('weekly')" class="px-3 py-1.5 rounded-lg transition text-white bg-indigo-600 shadow-xs">주간</button>
-                    <button id="viewDailyBtn" onclick="switchView('daily')" class="px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900">일간</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Room Metadata Details Card -->
-        <div id="roomDetailsCard" class="bg-indigo-50/60 border border-indigo-100 px-4 py-2.5 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-indigo-900">
-            <!-- JS populated room metadata -->
-        </div>
-
-        <!-- Legend Bar -->
-        <div class="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-600">
-            <div class="flex flex-wrap items-center gap-4">
-                <span class="flex items-center gap-1.5">
-                    <span class="w-3 h-3 rounded-full bg-emerald-100 border border-emerald-400"></span> 예약 가능
-                </span>
-                <span class="flex items-center gap-1.5">
-                    <span class="w-3 h-3 rounded-full bg-indigo-100 border border-indigo-500"></span> 일반 예약 완료
-                </span>
-                <span class="flex items-center gap-1.5">
-                    <span class="w-3 h-3 rounded-full bg-amber-100 border border-amber-500"></span> 고정/정규 수업
-                </span>
-                <span class="flex items-center gap-1.5">
-                    <span class="w-3 h-3 rounded-full bg-slate-200 border border-slate-400"></span> 예약 불가/마감
-                </span>
-            </div>
-            <div class="text-slate-400 hidden lg:block">
-                * 원하시는 교시의 슬롯을 클릭하면 예약을 신청하거나 상세 예약 내역을 확인할 수 있습니다.
-            </div>
-        </div>
-
-        <!-- Timetable Calendar Container -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="overflow-x-auto custom-scrollbar">
-                <table class="w-full border-collapse min-w-[700px]">
-                    <thead>
-                        <tr id="timetableHeader" class="bg-slate-50/80 border-b border-slate-200 text-slate-600 text-xs font-semibold">
-                            <!-- JS generates headers -->
-                        </tr>
-                    </thead>
-                    <tbody id="timetableBody" class="divide-y divide-slate-200">
-                        <!-- JS generates timetable slots -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="mt-auto bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        <p>한국 학교 교사를 위한 스마트 특별실 예약 시스템 &copy; 2026. 구글 시트 중앙 데이터베이스 자동 연결</p>
-    </footer>
-
-
-    <!-- MODAL 1: Reservation Modal (Create / View Detail) -->
-    <div id="reservationModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
-            
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                <div class="flex items-center space-x-2">
-                    <div id="modalStatusIcon" class="p-2 rounded-lg bg-indigo-100 text-indigo-600">
-                        <i data-lucide="calendar-plus" class="w-5 h-5"></i>
-                    </div>
-                    <div>
-                        <h3 id="modalTitle" class="font-bold text-slate-800 text-base">특별실 예약하기</h3>
-                        <p id="modalSubTitle" class="text-xs text-slate-500">2026-10-26 (월) | 3교시</p>
-                    </div>
-                </div>
-                <button onclick="closeModal('reservationModal')" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-
-            <div class="p-6 space-y-4">
-                <div id="occupiedNotice" class="hidden p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs leading-relaxed space-y-1">
-                    <p class="font-bold flex items-center gap-1.5 text-amber-900">
-                        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
-                        이미 예약이 완료된 시간입니다.
-                    </p>
-                    <p id="occupiedReason" class="text-amber-700">고정 수업 또는 다른 선생님의 예약이 존재합니다.</p>
-                </div>
-
-                <form id="reservationForm" onsubmit="handleReservationSubmit(event)" class="space-y-4">
-                    <input type="hidden" id="formRoomId">
-                    <input type="hidden" id="formDate">
-                    <input type="hidden" id="formPeriod">
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">예약 장소</label>
-                        <input type="text" id="formRoomName" readonly class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 font-semibold cursor-not-allowed">
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label for="formTeacher" class="block text-xs font-semibold text-slate-600 mb-1">담당 교사명 <span class="text-rose-500">*</span></label>
-                            <input type="text" id="formTeacher" required placeholder="예: 김선생" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-                        <div>
-                            <label for="formGradeClass" class="block text-xs font-semibold text-slate-600 mb-1">대상 학급 <span class="text-rose-500">*</span></label>
-                            <input type="text" id="formGradeClass" required placeholder="예: 3학년 2반" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label for="formPurpose" class="block text-xs font-semibold text-slate-600 mb-1">수업명 / 사용 목적 <span class="text-rose-500">*</span></label>
-                        <input type="text" id="formPurpose" required placeholder="예: 정보 실습 수업, 과학 탐구 실험" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-
-                    <div id="durationContainer">
-                        <label for="formDuration" class="block text-xs font-semibold text-slate-600 mb-1">연속 교시 선택</label>
-                        <select id="formDuration" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="1">1시간 (현재 교시만)</option>
-                            <option value="2">2시간 연속 예약</option>
-                            <option value="3">3시간 연속 예약</option>
-                            <option value="4">4시간 연속 예약</option>
-                        </select>
-                        <p class="text-[11px] text-slate-400 mt-1">* 후속 교시에 이미 예약이 있을 경우 실패할 수 있습니다.</p>
-                    </div>
-
-                    <div>
-                        <label for="formPassword" class="block text-xs font-semibold text-slate-600 mb-1">예약 비밀번호 (4자리) <span class="text-rose-500">*</span></label>
-                        <input type="password" id="formPassword" maxlength="4" required placeholder="예: 1234 (취소시 필요)" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-
-                    <div class="pt-2 flex justify-end space-x-2">
-                        <button type="button" onclick="closeModal('reservationModal')" class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition">
-                            닫기
-                        </button>
-                        <button id="cancelReservationBtn" type="button" onclick="handleCancelReservation()" class="hidden px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition">
-                            예약 취소
-                        </button>
-                        <button id="submitReservationBtn" type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-md shadow-indigo-100 transition">
-                            예약하기
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
+<header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+    <div class="flex items-center space-x-3">
+      <div class="bg-indigo-600 text-white p-2.5 rounded-xl shadow-md shadow-indigo-200"><i data-lucide="door-open" class="w-6 h-6"></i></div>
+      <div>
+        <h1 class="text-lg font-bold text-slate-900 leading-tight">학교 특별실 예약 시스템</h1>
+        <p class="text-xs text-slate-500 hidden sm:block">스마트한 교실 공유 & 시간표 관리</p>
+      </div>
     </div>
-
-
-    <!-- MODAL 2: Fixed Timetable Management Modal -->
-    <div id="fixedScheduleModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
-            
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                <div class="flex items-center space-x-2">
-                    <div class="p-2 rounded-lg bg-amber-100 text-amber-600">
-                        <i data-lucide="calendar-clock" class="w-5 h-5"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-slate-800 text-base">고정 시간표 (정규 수업) 일괄 등록</h3>
-                        <p class="text-xs text-slate-500">매주 반복되는 정규 수업을 등록하여 자동으로 예약 불가로 지정합니다.</p>
-                    </div>
-                </div>
-                <button onclick="closeModal('fixedScheduleModal')" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-
-            <div class="p-6 space-y-5 max-h-[80vh] overflow-y-auto custom-scrollbar">
-                
-                <form onsubmit="handleFixedScheduleSubmit(event)" class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                    <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider">새 고정 시간표 추가</h4>
-                    
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">요일</label>
-                            <select id="fixedDay" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-medium">
-                                <option value="1">월요일</option>
-                                <option value="2">화요일</option>
-                                <option value="3">수요일</option>
-                                <option value="4">목요일</option>
-                                <option value="5">금요일</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">교시</label>
-                            <select id="fixedPeriod" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-medium">
-                                <option value="1">1교시</option>
-                                <option value="2">2교시</option>
-                                <option value="3">3교시</option>
-                                <option value="4">4교시</option>
-                                <option value="5">5교시</option>
-                                <option value="6">6교시</option>
-                                <option value="7">7교시</option>
-                                <option value="8">8교시</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">학급</label>
-                            <input type="text" id="fixedGradeClass" required placeholder="예: 1-1" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">과목/교사</label>
-                            <input type="text" id="fixedSubject" required placeholder="예: 정보 (이선생)" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs">
-                        </div>
-                    </div>
-
-                    <div class="flex justify-end pt-1">
-                        <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1">
-                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> 고정 수업 등록
-                        </button>
-                    </div>
-                </form>
-
-                <div>
-                    <h4 class="text-xs font-bold text-slate-700 mb-2">현재 선택된 특별실의 고정 시간표 목록</h4>
-                    <div id="fixedScheduleList" class="space-y-2">
-                        <!-- JS generated items -->
-                    </div>
-                </div>
-
-            </div>
-        </div>
+    <div class="flex items-center space-x-2 sm:space-x-3">
+      <div id="syncStatusBadge" class="hidden sm:flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span id="syncStatusText">불러오는 중...</span>
+      </div>
+      <button onclick="openSearchModal()" class="hbtn"><i data-lucide="search" class="w-4 h-4"></i><span class="hidden md:inline">예약 검색</span></button>
+      <button onclick="openFixedScheduleModal()" class="hbtn"><i data-lucide="calendar-check-2" class="w-4 h-4"></i><span class="hidden md:inline">고정 시간표 설정</span></button>
+      <button onclick="openSettingsModal()" class="hbtn" title="시스템 설정"><i data-lucide="settings" class="w-5 h-5"></i></button>
     </div>
+  </div>
+</header>
 
+<main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-6 space-y-5">
 
-    <!-- MODAL 3: Search & Export Modal -->
-    <div id="searchModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                <div class="flex items-center space-x-2">
-                    <div class="p-2 rounded-lg bg-indigo-100 text-indigo-600">
-                        <i data-lucide="search" class="w-5 h-5"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-slate-800 text-base">예약 내역 검색 및 내보내기</h3>
-                        <p class="text-xs text-slate-500">교사명, 학급, 수업명으로 검색하고 엑셀(CSV)로 추출합니다.</p>
-                    </div>
-                </div>
-                <button onclick="closeModal('searchModal')" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-
-            <div class="p-6 space-y-4">
-                <div class="flex flex-col sm:flex-row gap-3">
-                    <input type="text" id="searchInput" oninput="filterSearchResults()" placeholder="교사명, 학급, 목적으로 검색..." class="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500">
-                    <button onclick="exportToCSV()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 transition">
-                        <i data-lucide="download" class="w-4 h-4"></i> Excel (CSV) 다운로드
-                    </button>
-                </div>
-
-                <div class="max-h-80 overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl">
-                    <table class="w-full text-xs text-left text-slate-600">
-                        <thead class="bg-slate-50 border-b border-slate-200 sticky top-0">
-                            <tr>
-                                <th class="p-3">날짜</th>
-                                <th class="p-3">특별실</th>
-                                <th class="p-3">교시</th>
-                                <th class="p-3">담당 교사</th>
-                                <th class="p-3">학급</th>
-                                <th class="p-3">수업/목적</th>
-                            </tr>
-                        </thead>
-                        <tbody id="searchResultsBody" class="divide-y divide-slate-100">
-                            <!-- JS populated -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+  <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
+    <div class="flex items-center space-x-3">
+      <label for="roomSelect" class="text-sm font-semibold text-slate-700 flex items-center gap-1.5 whitespace-nowrap"><i data-lucide="building-2" class="w-4 h-4 text-indigo-600"></i>특별실 선택:</label>
+      <select id="roomSelect" onchange="handleRoomChange()" class="w-full md:w-64 bg-slate-50 border border-slate-300 text-sm rounded-xl p-2.5 font-semibold"></select>
+      <button onclick="openRoomManagementModal()" class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg" title="특별실 목록 관리"><i data-lucide="plus-circle" class="w-5 h-5"></i></button>
     </div>
-
-
-    <!-- MODAL 4: Settings Modal -->
-    <div id="settingsModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                <div class="flex items-center space-x-2">
-                    <div class="p-2 rounded-lg bg-slate-200 text-slate-700">
-                        <i data-lucide="settings" class="w-5 h-5"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-slate-800 text-base">시스템 설정 정보</h3>
-                        <p class="text-xs text-slate-500">연동된 구글 시트 중앙 데이터베이스 현황입니다.</p>
-                    </div>
-                </div>
-                <button onclick="closeModal('settingsModal')" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-
-            <div class="p-6 space-y-5">
-                <div class="space-y-2">
-                    <label class="block text-xs font-semibold text-slate-600">현재 연결된 구글 시트 Web App URL</label>
-                    <input type="text" id="gasUrlInput" readonly class="w-full bg-slate-100 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-600 font-mono">
-                </div>
-
-                <div class="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl text-xs text-emerald-900 space-y-1">
-                    <p class="font-bold flex items-center gap-1.5 text-emerald-800">
-                        <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i> 중앙 DB 연결 성공
-                    </p>
-                    <p class="text-emerald-700">모든 선생님이 동일한 구글 시트 데이터베이스를 공유하고 있으며, 실시간으로 예약 내역이 반영됩니다.</p>
-                </div>
-
-                <div class="pt-3 border-t border-slate-200 flex justify-between items-center">
-                    <span class="text-xs text-slate-400">데이터 새로고침</span>
-                    <button onclick="syncWithGoogleSheets(true)" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-200 transition flex items-center gap-1">
-                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> 시트 데이터 수동 동기화
-                    </button>
-                </div>
-            </div>
-        </div>
+    <div class="flex items-center justify-between md:justify-end space-x-2 sm:space-x-4">
+      <div class="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl">
+        <button onclick="navigateDate(-1)" class="p-1.5 text-slate-600 hover:bg-white rounded-lg"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+        <button onclick="navigateToday()" class="px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-white rounded-lg">오늘</button>
+        <button onclick="navigateDate(1)" class="p-1.5 text-slate-600 hover:bg-white rounded-lg"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+      </div>
+      <div id="currentDateDisplay" class="text-base font-bold text-slate-800 min-w-[140px] text-center"></div>
+      <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+        <button id="viewWeeklyBtn" onclick="switchView('weekly')" class="px-3 py-1.5 rounded-lg text-white bg-indigo-600">주간</button>
+        <button id="viewDailyBtn" onclick="switchView('daily')" class="px-3 py-1.5 rounded-lg text-slate-600">일간</button>
+      </div>
     </div>
+  </div>
 
+  <div id="roomDetailsCard" class="bg-indigo-50/60 border border-indigo-100 px-4 py-2.5 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-indigo-900"></div>
 
-    <!-- MODAL 5: Room Management Modal (Manage, Add, Edit, Delete Rooms) -->
-    <div id="roomManagementModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
-                <div class="flex items-center space-x-2">
-                    <div class="p-2 rounded-lg bg-indigo-100 text-indigo-600">
-                        <i data-lucide="building-2" class="w-5 h-5"></i>
-                    </div>
-                    <div>
-                        <h3 class="font-bold text-slate-800 text-base">특별실 목록 및 상세정보 관리</h3>
-                        <p class="text-xs text-slate-500">특별실 추가, 정보 수정 및 삭제를 관리합니다.</p>
-                    </div>
-                </div>
-                <button onclick="closeModal('roomManagementModal')" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-
-            <div class="p-6 space-y-5 max-h-[80vh] overflow-y-auto custom-scrollbar">
-                
-                <!-- Add / Edit Room Form -->
-                <form id="roomForm" onsubmit="handleSaveRoom(event)" class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                    <h4 id="roomFormTitle" class="text-xs font-bold text-slate-700 uppercase tracking-wider">새 특별실 등록</h4>
-                    <input type="hidden" id="editRoomId" value="">
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">특별실 이름 <span class="text-rose-500">*</span></label>
-                            <input type="text" id="manageRoomName" required placeholder="예: AI 실습실" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">위치 (층/건물)</label>
-                            <input type="text" id="manageRoomLocation" placeholder="예: 창의관 3층" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">수용 인원</label>
-                            <input type="text" id="manageRoomCapacity" placeholder="예: 30명" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">주요 보유 기자재</label>
-                            <input type="text" id="manageRoomEquipment" placeholder="예: 태블릿 30대, 3D프린터" class="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs">
-                        </div>
-                    </div>
-
-                    <div class="flex justify-end space-x-2 pt-1">
-                        <button id="cancelEditRoomBtn" type="button" onclick="resetRoomForm()" class="hidden px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg transition">
-                            취소
-                        </button>
-                        <button type="submit" id="saveRoomBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition">
-                            특별실 저장
-                        </button>
-                    </div>
-                </form>
-
-                <!-- Registered Rooms List -->
-                <div>
-                    <h4 class="text-xs font-bold text-slate-700 mb-2">현재 등록된 특별실 목록</h4>
-                    <div id="roomListContainer" class="space-y-2">
-                        <!-- JS generated room items -->
-                    </div>
-                </div>
-
-            </div>
-        </div>
+  <div class="flex flex-wrap items-center justify-between gap-3 bg-white px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-600">
+    <div class="flex flex-wrap items-center gap-4">
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-100 border border-emerald-400"></span> 예약 가능</span>
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-indigo-100 border border-indigo-500"></span> 일반 예약 완료</span>
+      <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-100 border border-amber-500"></span> 고정/정규 수업</span>
     </div>
+    <div class="text-slate-400 hidden lg:block">* 원하시는 교시를 클릭하면 예약하거나 상세 내역을 확인할 수 있습니다.</div>
+  </div>
 
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto custom-scrollbar">
+      <table class="w-full border-collapse min-w-[700px]">
+        <thead><tr id="timetableHeader" class="bg-slate-50/80 border-b border-slate-200 text-slate-600 text-xs font-semibold"></tr></thead>
+        <tbody id="timetableBody" class="divide-y divide-slate-200"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
 
-    <!-- JAVASCRIPT LOGIC -->
-    <script>
-        // --- CONSTANTS & STATE ---
-        const DEFAULT_ROOMS = [
-            { id: 'room-1', name: 'AI 디스커버리 허브', location: '창의관 3층', capacity: '32명', equipment: '최신 PC 32대, 전자칠판' },
-            { id: 'room-2', name: '컴퓨터실 2', location: '본관 4층', capacity: '35명', equipment: '노트북 35대' },
-            { id: 'room-3', name: '과학 탐구실', location: '과학관 2층', capacity: '30명', equipment: '현미경, 실험대 6조' },
-            { id: 'room-4', name: '음악실', location: '예술관 1층', capacity: '40명', equipment: '피아노, 오케스트라 악기' },
-            { id: 'room-5', name: '미디어 스튜디오', location: '본관 2층', capacity: '20명', equipment: '크로마키, 방송 카메라' }
-        ];
+<footer class="mt-auto bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+  <p>학교 특별실 예약 시스템 &copy; 2026 · 구글 시트 중앙 데이터베이스 연결</p>
+</footer>
 
-        const PERIOD_TIMES = [
-            { period: 1, name: '1교시', time: '09:00 - 09:50' },
-            { period: 2, name: '2교시', time: '10:00 - 10:50' },
-            { period: 3, name: '3교시', time: '11:00 - 11:50' },
-            { period: 4, name: '4교시', time: '12:00 - 12:50' },
-            { period: 5, name: '5교시', time: '13:50 - 14:40' },
-            { period: 6, name: '6교시', time: '14:50 - 15:40' },
-            { period: 7, name: '7교시', time: '15:50 - 16:40' },
-            { period: 8, name: '8교시', time: '16:50 - 17:40' }
-        ];
+<!-- 모달 1: 예약 -->
+<div id="reservationModal" class="modal hidden">
+  <div class="mbox max-w-md">
+    <div class="mhead">
+      <div><h3 class="mtitle">특별실 예약하기</h3><p id="modalSubTitle" class="msub"></p></div>
+      <button onclick="closeModal('reservationModal')" class="xbtn"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div id="occupiedNotice" class="hidden p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs space-y-1">
+        <p class="font-bold text-amber-900">이미 예약이 완료된 시간입니다.</p>
+        <p id="occupiedReason"></p>
+      </div>
+      <form id="reservationForm" onsubmit="handleReservationSubmit(event)" class="space-y-4">
+        <input type="hidden" id="formRoomId"><input type="hidden" id="formDate"><input type="hidden" id="formPeriod">
+        <div><label class="lbl">예약 장소</label><input type="text" id="formRoomName" readonly class="inp bg-slate-100 cursor-not-allowed font-semibold"></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label for="formTeacher" class="lbl">담당 교사명 <span class="text-rose-500">*</span></label><input type="text" id="formTeacher" required placeholder="예: 김선생" class="inp"></div>
+          <div><label for="formGradeClass" class="lbl">대상 학급 <span class="text-rose-500">*</span></label><input type="text" id="formGradeClass" required placeholder="예: 3학년 2반" class="inp"></div>
+        </div>
+        <div><label for="formPurpose" class="lbl">수업명 / 사용 목적 <span class="text-rose-500">*</span></label><input type="text" id="formPurpose" required placeholder="예: 정보 실습 수업" class="inp"></div>
+        <div id="durationContainer">
+          <label for="formDuration" class="lbl">연속 교시 선택</label>
+          <select id="formDuration" class="inp">
+            <option value="1">1시간 (현재 교시만)</option><option value="2">2시간 연속 예약</option>
+            <option value="3">3시간 연속 예약</option><option value="4">4시간 연속 예약</option>
+          </select>
+          <p class="text-[11px] text-slate-400 mt-1">* 후속 교시에 이미 예약이 있으면 실패합니다.</p>
+        </div>
+        <div><label for="formPassword" class="lbl">예약 비밀번호 (4자리) <span class="text-rose-500">*</span></label><input type="password" id="formPassword" maxlength="4" required placeholder="취소할 때 필요합니다" class="inp"></div>
+        <div class="pt-2 flex justify-end space-x-2">
+          <button type="button" onclick="closeModal('reservationModal')" class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-600 text-sm font-semibold hover:bg-slate-50">닫기</button>
+          <button id="cancelReservationBtn" type="button" onclick="handleCancelReservation()" class="hidden px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold">예약 취소</button>
+          <button id="submitReservationBtn" type="submit" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">예약하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
-        const WEEKDAYS = ['월', '화', '수', '목', '금'];
+<!-- 모달 2: 고정 시간표 -->
+<div id="fixedScheduleModal" class="modal hidden">
+  <div class="mbox max-w-2xl">
+    <div class="mhead">
+      <div><h3 class="mtitle">고정 시간표 (정규 수업) 등록</h3><p class="msub">매주 반복되는 정규 수업은 자동으로 예약 불가가 됩니다.</p></div>
+      <button onclick="closeModal('fixedScheduleModal')" class="xbtn"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-6 space-y-5 max-h-[80vh] overflow-y-auto custom-scrollbar">
+      <form onsubmit="handleFixedScheduleSubmit(event)" class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+        <h4 class="text-xs font-bold text-slate-700">새 고정 시간표 추가</h4>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div><label class="lbl">요일</label>
+            <select id="fixedDay" class="sm-inp"><option value="1">월요일</option><option value="2">화요일</option><option value="3">수요일</option><option value="4">목요일</option><option value="5">금요일</option></select></div>
+          <div><label class="lbl">교시</label>
+            <select id="fixedPeriod" class="sm-inp"><option value="1">1교시</option><option value="2">2교시</option><option value="3">3교시</option><option value="4">4교시</option><option value="5">5교시</option><option value="6">6교시</option><option value="7">7교시</option><option value="8">8교시</option></select></div>
+          <div><label class="lbl">학급</label><input type="text" id="fixedGradeClass" required placeholder="예: 1-1" class="sm-inp"></div>
+          <div><label class="lbl">과목/교사</label><input type="text" id="fixedSubject" required placeholder="예: 정보 (이선생)" class="sm-inp"></div>
+        </div>
+        <div class="flex justify-end"><button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold">+ 고정 수업 등록</button></div>
+      </form>
+      <div><h4 class="text-xs font-bold text-slate-700 mb-2">현재 특별실의 고정 시간표</h4><div id="fixedScheduleList" class="space-y-2"></div></div>
+    </div>
+  </div>
+</div>
 
-        // App State Variables
-        let state = {
-            rooms: JSON.parse(localStorage.getItem('rooms_v2')) || DEFAULT_ROOMS,
-            selectedRoomId: localStorage.getItem('selectedRoom_v2') || 'room-1',
-            currentDate: new Date(),
-            viewMode: 'weekly',
-            reservations: JSON.parse(localStorage.getItem('reservations_v2')) || [],
-            fixedSchedules: JSON.parse(localStorage.getItem('fixedSchedules_v2')) || [],
-            gasUrl: DEFAULT_GAS_URL
-        };
+<!-- 모달 3: 검색 -->
+<div id="searchModal" class="modal hidden">
+  <div class="mbox max-w-3xl">
+    <div class="mhead">
+      <div><h3 class="mtitle">예약 내역 검색 및 내보내기</h3><p class="msub">교사명, 학급, 수업명으로 검색하고 CSV로 저장합니다.</p></div>
+      <button onclick="closeModal('searchModal')" class="xbtn"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div class="flex flex-col sm:flex-row gap-3">
+        <input type="text" id="searchInput" oninput="filterSearchResults()" placeholder="교사명, 학급, 목적으로 검색..." class="inp flex-1">
+        <button onclick="exportToCSV()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold">Excel (CSV) 다운로드</button>
+      </div>
+      <div class="max-h-80 overflow-y-auto custom-scrollbar border border-slate-200 rounded-xl">
+        <table class="w-full text-xs text-left text-slate-600">
+          <thead class="bg-slate-50 border-b border-slate-200 sticky top-0"><tr><th class="p-3">날짜</th><th class="p-3">특별실</th><th class="p-3">교시</th><th class="p-3">담당 교사</th><th class="p-3">학급</th><th class="p-3">수업/목적</th></tr></thead>
+          <tbody id="searchResultsBody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
 
-        // Initialize App
-        window.onload = function() {
-            lucide.createIcons();
-            
-            // Seed sample data if completely empty
-            if (state.reservations.length === 0 && state.fixedSchedules.length === 0) {
-                seedSampleData();
-            }
+<!-- 모달 4: 설정 -->
+<div id="settingsModal" class="modal hidden">
+  <div class="mbox max-w-lg">
+    <div class="mhead">
+      <div><h3 class="mtitle">시스템 설정 정보</h3><p class="msub">연동된 구글 시트 데이터베이스 현황입니다.</p></div>
+      <button onclick="closeModal('settingsModal')" class="xbtn"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-6 space-y-5">
+      <div class="space-y-2"><label class="lbl">연결된 구글 시트 Web App URL</label><input type="text" id="gasUrlInput" readonly class="w-full bg-slate-100 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-600 font-mono"></div>
+      <div class="bg-emerald-50 border border-emerald-200 p-3.5 rounded-xl text-xs text-emerald-800">모든 선생님이 같은 구글 시트를 공유하며, 어떤 브라우저에서 열어도 같은 예약이 보입니다. (1분마다 자동 새로고침)</div>
+      <div class="pt-3 border-t border-slate-200 flex justify-between items-center">
+        <span class="text-xs text-slate-400">데이터 새로고침</span>
+        <button onclick="syncWithGoogleSheets()" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-200">시트 데이터 수동 동기화</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-            // Sync with Google Sheets on startup
-            syncWithGoogleSheets(true);
+<!-- 모달 5: 특별실 관리 -->
+<div id="roomManagementModal" class="modal hidden">
+  <div class="mbox max-w-lg">
+    <div class="mhead">
+      <div><h3 class="mtitle">특별실 목록 및 상세정보 관리</h3><p class="msub">특별실 추가, 수정, 삭제를 관리합니다.</p></div>
+      <button onclick="closeModal('roomManagementModal')" class="xbtn"><i data-lucide="x" class="w-5 h-5"></i></button>
+    </div>
+    <div class="p-6 space-y-5 max-h-[80vh] overflow-y-auto custom-scrollbar">
+      <form id="roomForm" onsubmit="handleSaveRoom(event)" class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+        <h4 id="roomFormTitle" class="text-xs font-bold text-slate-700">새 특별실 등록</h4>
+        <input type="hidden" id="editRoomId" value="">
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="lbl">특별실 이름 <span class="text-rose-500">*</span></label><input type="text" id="manageRoomName" required placeholder="예: AI 실습실" class="sm-inp"></div>
+          <div><label class="lbl">위치 (층/건물)</label><input type="text" id="manageRoomLocation" placeholder="예: 창의관 3층" class="sm-inp"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="lbl">수용 인원</label><input type="text" id="manageRoomCapacity" placeholder="예: 30명" class="sm-inp"></div>
+          <div><label class="lbl">주요 보유 기자재</label><input type="text" id="manageRoomEquipment" placeholder="예: 태블릿 30대" class="sm-inp"></div>
+        </div>
+        <div class="flex justify-end space-x-2">
+          <button id="cancelEditRoomBtn" type="button" onclick="resetRoomForm()" class="hidden px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg">취소</button>
+          <button type="submit" id="saveRoomBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold">특별실 저장</button>
+        </div>
+      </form>
+      <div><h4 class="text-xs font-bold text-slate-700 mb-2">현재 등록된 특별실 목록</h4><div id="roomListContainer" class="space-y-2"></div></div>
+    </div>
+  </div>
+</div>
 
-            renderRoomSelect();
-            renderTimetable();
-        };
+<script>
+// ===================== 상수 =====================
+const PERIOD_TIMES = [
+  { period: 1, name: '1교시', time: '09:00 - 09:50' }, { period: 2, name: '2교시', time: '10:00 - 10:50' },
+  { period: 3, name: '3교시', time: '11:00 - 11:50' }, { period: 4, name: '4교시', time: '12:00 - 12:50' },
+  { period: 5, name: '5교시', time: '13:50 - 14:40' }, { period: 6, name: '6교시', time: '14:50 - 15:40' },
+  { period: 7, name: '7교시', time: '15:50 - 16:40' }, { period: 8, name: '8교시', time: '16:50 - 17:40' }
+];
+const WEEKDAYS = ['월', '화', '수', '목', '금'];
 
-        // --- SAMPLE DATA GENERATOR ---
-        function seedSampleData() {
-            const todayStr = formatDate(new Date());
-            
-            state.fixedSchedules = [
-                { id: 'fs-1', roomId: 'room-1', dayOfWeek: 2, period: 1, gradeClass: '2-3', subject: '정보' },
-                { id: 'fs-2', roomId: 'room-1', dayOfWeek: 2, period: 2, gradeClass: '2-4', subject: '정보' },
-                { id: 'fs-3', roomId: 'room-1', dayOfWeek: 2, period: 4, gradeClass: '창체동아리', subject: '정보' },
-                { id: 'fs-4', roomId: 'room-1', dayOfWeek: 3, period: 1, gradeClass: '2-1', subject: '정보' },
-                { id: 'fs-5', roomId: 'room-1', dayOfWeek: 3, period: 2, gradeClass: '2-5', subject: '정보' },
-                { id: 'fs-6', roomId: 'room-1', dayOfWeek: 4, period: 2, gradeClass: '2-2', subject: '정보' }
-            ];
+// 데이터는 서버(구글 시트)에서만 가져옵니다. 브라우저에는 "선택한 특별실"만 저장합니다.
+let state = {
+  rooms: [],
+  selectedRoomId: localStorage.getItem('selectedRoom_v2') || '',
+  currentDate: new Date(),
+  viewMode: 'weekly',
+  reservations: [],
+  fixedSchedules: [],
+  gasUrl: DEFAULT_GAS_URL
+};
 
-            state.reservations = [
-                {
-                    id: 'res-1',
-                    roomId: 'room-1',
-                    date: todayStr,
-                    period: 3,
-                    teacher: '김선생',
-                    gradeClass: '3학년 2반',
-                    purpose: 'SW 프로그래밍 실습',
-                    isFixed: false,
-                    password: '1234',
-                    createdAt: new Date().toISOString()
-                }
-            ];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-            saveDataToLocal();
+window.onload = function () {
+  lucide.createIcons();
+  loadFromServer();
+  setInterval(() => { if (!document.hidden) loadFromServer(true); }, 60000);
+};
+
+function saveDataToLocal() { localStorage.setItem('selectedRoom_v2', state.selectedRoomId); }
+function setSync(t) { const el = document.getElementById('syncStatusText'); if (el) el.innerText = t; }
+
+// ===================== 서버 통신 =====================
+async function api(action, payload) {
+  const res = await fetch(state.gasUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, payload })
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || '저장에 실패했습니다.');
+  return data;
+}
+
+async function loadFromServer(silent = false) {
+  if (!silent) setSync('불러오는 중...');
+  try {
+    const res = await fetch(state.gasUrl + '?action=getAll&t=' + Date.now());
+    const d = await res.json();
+    if (!d.ok) throw new Error(d.error);
+    state.rooms = d.rooms;
+    state.reservations = d.reservations;
+    state.fixedSchedules = d.fixedSchedules;
+    if (!state.rooms.some(r => r.id === state.selectedRoomId)) state.selectedRoomId = state.rooms.length ? state.rooms[0].id : '';
+    setSync('구글 시트 연동 완료');
+    renderRoomSelect();
+    renderTimetable();
+  } catch (err) {
+    console.error(err);
+    setSync('연동 실패 - 새로고침 해주세요');
+    if (!silent) alert('구글 시트에서 데이터를 불러오지 못했습니다.\n앱스 스크립트 배포 설정(액세스: 모든 사용자)을 확인해 주세요.');
+  }
+}
+
+function syncWithGoogleSheets() { return loadFromServer(); }
+
+async function mutate(action, payload) {
+  setSync('저장 중...');
+  try {
+    await api(action, payload);
+    await loadFromServer(true);
+    setSync('구글 시트 연동 완료');
+    return true;
+  } catch (err) {
+    alert(err.message);
+    await loadFromServer(true);
+    return false;
+  }
+}
+
+// ===================== 화면 그리기 =====================
+function renderRoomSelect() {
+  document.getElementById('roomSelect').innerHTML = state.rooms.map(r =>
+    `<option value="${esc(r.id)}" ${r.id === state.selectedRoomId ? 'selected' : ''}>${esc(r.name)}</option>`).join('');
+  renderRoomDetailsBadge();
+}
+
+function renderRoomDetailsBadge() {
+  const r = state.rooms.find(x => x.id === state.selectedRoomId);
+  const box = document.getElementById('roomDetailsCard');
+  if (!r) { box.innerHTML = ''; return; }
+  box.innerHTML = `
+    <div class="flex items-center gap-3">
+      <span class="font-bold flex items-center gap-1"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-indigo-600"></i> ${esc(r.location) || '위치 미지정'}</span>
+      <span class="text-indigo-300">|</span>
+      <span class="font-medium flex items-center gap-1"><i data-lucide="users" class="w-3.5 h-3.5 text-indigo-600"></i> 수용: ${esc(r.capacity) || '미정'}</span>
+    </div>
+    <div class="text-indigo-700 font-medium truncate max-w-md"><span class="font-bold text-indigo-900">보유 기기:</span> ${esc(r.equipment) || '특이사항 없음'}</div>`;
+  lucide.createIcons();
+}
+
+function handleRoomChange() {
+  state.selectedRoomId = document.getElementById('roomSelect').value;
+  saveDataToLocal();
+  renderRoomDetailsBadge();
+  renderTimetable();
+}
+
+function findFixed(dow, period) { return state.fixedSchedules.find(f => f.roomId === state.selectedRoomId && f.dayOfWeek === dow && f.period === period); }
+function findRes(dateStr, period) { return state.reservations.find(r => r.roomId === state.selectedRoomId && r.date === dateStr && r.period === period); }
+
+function renderTimetable() {
+  const header = document.getElementById('timetableHeader');
+  const body = document.getElementById('timetableBody');
+  const disp = document.getElementById('currentDateDisplay');
+
+  if (state.viewMode === 'weekly') {
+    const wd = getWeekDates(state.currentDate);
+    disp.innerText = `${wd[0].getMonth() + 1}월 ${wd[0].getDate()}일 - ${wd[4].getMonth() + 1}월 ${wd[4].getDate()}일`;
+
+    header.innerHTML = `<th class="p-3 text-center border-r border-slate-200 bg-slate-100/70 w-24">교시 / 시간</th>` +
+      wd.map((d, i) => `<th class="p-3 text-center border-r border-slate-200 ${isSameDate(d, new Date()) ? 'bg-indigo-50/80 text-indigo-700 font-bold' : ''}">
+        <div>${WEEKDAYS[i]}요일</div><div class="text-[11px] font-normal text-slate-500">${d.getMonth() + 1}.${d.getDate()}</div></th>`).join('');
+
+    body.innerHTML = PERIOD_TIMES.map(p => {
+      let row = `<tr class="hover:bg-slate-50/50"><td class="p-2.5 text-center border-r border-slate-200 bg-slate-50/60">
+        <div class="font-bold text-slate-800 text-xs">${p.name}</div><div class="text-[10px] text-slate-400">${p.time}</div></td>`;
+      wd.forEach((d, di) => {
+        const ds = formatDate(d), fixed = findFixed(di + 1, p.period), res = findRes(ds, p.period);
+        let cls = 'bg-white hover:bg-emerald-50/40', html = `<span class="text-xs text-slate-300">예약 가능</span>`;
+        if (fixed) {
+          cls = 'bg-amber-50/90 hover:bg-amber-100/80 text-amber-900 border-l-4 border-l-amber-500';
+          html = `<div class="font-bold text-xs flex items-center justify-center gap-1"><span class="px-1 bg-amber-200 text-[10px] rounded">고정</span>${esc(fixed.subject)}</div>
+                  <div class="text-[11px] text-amber-700 mt-0.5">${esc(fixed.gradeClass)}</div>`;
+        } else if (res) {
+          cls = 'bg-indigo-50/90 hover:bg-indigo-100/80 text-indigo-900 border-l-4 border-l-indigo-500';
+          html = `<div class="font-bold text-xs truncate">${esc(res.purpose)}</div>
+                  <div class="text-[11px] text-indigo-700 mt-0.5 flex justify-between"><span>${esc(res.teacher)}</span><span class="font-semibold">${esc(res.gradeClass)}</span></div>`;
         }
-
-        // --- LOCAL STORAGE HELPERS ---
-        function saveDataToLocal() {
-            localStorage.setItem('rooms_v2', JSON.stringify(state.rooms));
-            localStorage.setItem('reservations_v2', JSON.stringify(state.reservations));
-            localStorage.setItem('fixedSchedules_v2', JSON.stringify(state.fixedSchedules));
-            localStorage.setItem('selectedRoom_v2', state.selectedRoomId);
-        }
-
-        // --- RENDER LOGIC ---
-        function renderRoomSelect() {
-            const select = document.getElementById('roomSelect');
-            select.innerHTML = state.rooms.map(r => 
-                `<option value="${r.id}" ${r.id === state.selectedRoomId ? 'selected' : ''}>${r.name}</option>`
-            ).join('');
-
-            renderRoomDetailsBadge();
-        }
-
-        function renderRoomDetailsBadge() {
-            const currentRoom = state.rooms.find(r => r.id === state.selectedRoomId);
-            const badgeContainer = document.getElementById('roomDetailsCard');
-
-            if (!currentRoom) return;
-
-            badgeContainer.innerHTML = `
-                <div class="flex items-center gap-3">
-                    <span class="font-bold flex items-center gap-1"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-indigo-600"></i> ${currentRoom.location || '위치 미지정'}</span>
-                    <span class="text-indigo-300">|</span>
-                    <span class="font-medium flex items-center gap-1"><i data-lucide="users" class="w-3.5 h-3.5 text-indigo-600"></i> 수용: ${currentRoom.capacity || '미정'}</span>
-                </div>
-                <div class="text-indigo-700 font-medium truncate max-w-md">
-                    <span class="font-bold text-indigo-900">보유 기기:</span> ${currentRoom.equipment || '특이사항 없음'}
-                </div>
-            `;
-            lucide.createIcons();
-        }
-
-        function handleRoomChange() {
-            const select = document.getElementById('roomSelect');
-            state.selectedRoomId = select.value;
-            saveDataToLocal();
-            renderRoomDetailsBadge();
-            renderTimetable();
-        }
-
-        function renderTimetable() {
-            const header = document.getElementById('timetableHeader');
-            const body = document.getElementById('timetableBody');
-            const dateDisplay = document.getElementById('currentDateDisplay');
-
-            if (state.viewMode === 'weekly') {
-                const weekDates = getWeekDates(state.currentDate);
-                const firstDate = weekDates[0];
-                const lastDate = weekDates[4];
-                dateDisplay.innerText = `${firstDate.getMonth() + 1}월 ${firstDate.getDate()}일 - ${lastDate.getMonth() + 1}월 ${lastDate.getDate()}일`;
-
-                let headerHtml = `<th class="p-3 text-center border-r border-slate-200 bg-slate-100/70 w-24">교시 / 시간</th>`;
-                weekDates.forEach((date, index) => {
-                    const isToday = isSameDate(date, new Date());
-                    headerHtml += `
-                        <th class="p-3 text-center border-r border-slate-200 ${isToday ? 'bg-indigo-50/80 text-indigo-700 font-bold' : ''}">
-                            <div>${WEEKDAYS[index]}요일</div>
-                            <div class="text-[11px] font-normal text-slate-500">${date.getMonth() + 1}.${date.getDate()}</div>
-                        </th>
-                    `;
-                });
-                header.innerHTML = headerHtml;
-
-                let bodyHtml = '';
-                PERIOD_TIMES.forEach(p => {
-                    bodyHtml += `<tr class="hover:bg-slate-50/50 transition">`;
-                    bodyHtml += `
-                        <td class="p-2.5 text-center border-r border-slate-200 bg-slate-50/60 font-medium">
-                            <div class="font-bold text-slate-800 text-xs">${p.name}</div>
-                            <div class="text-[10px] text-slate-400">${p.time}</div>
-                        </td>
-                    `;
-
-                    weekDates.forEach((date, dayIndex) => {
-                        const dateStr = formatDate(date);
-                        const dayOfWeek = dayIndex + 1;
-
-                        const fixed = state.fixedSchedules.find(f => f.roomId === state.selectedRoomId && f.dayOfWeek === dayOfWeek && f.period === p.period);
-                        const res = state.reservations.find(r => r.roomId === state.selectedRoomId && r.date === dateStr && r.period === p.period);
-
-                        let cellClass = "bg-white hover:bg-emerald-50/40 text-slate-400";
-                        let content = `<span class="text-xs text-slate-300 font-normal">예약 가능</span>`;
-
-                        if (fixed) {
-                            cellClass = "bg-amber-50/90 hover:bg-amber-100/80 text-amber-900 border-l-4 border-l-amber-500";
-                            content = `
-                                <div class="font-bold text-xs flex items-center justify-center gap-1">
-                                    <span class="px-1 py-0.2 bg-amber-200 text-[10px] rounded text-amber-900">고정</span>
-                                    ${fixed.subject}
-                                </div>
-                                <div class="text-[11px] text-amber-700 mt-0.5">${fixed.gradeClass}</div>
-                            `;
-                        } else if (res) {
-                            cellClass = "bg-indigo-50/90 hover:bg-indigo-100/80 text-indigo-900 border-l-4 border-l-indigo-500";
-                            content = `
-                                <div class="font-bold text-xs text-indigo-900 truncate">${res.purpose}</div>
-                                <div class="text-[11px] text-indigo-700 mt-0.5 flex justify-between items-center">
-                                    <span>${res.teacher}</span>
-                                    <span class="font-semibold text-indigo-800">${res.gradeClass}</span>
-                                </div>
-                            `;
-                        }
-
-                        bodyHtml += `
-                            <td onclick="openSlotModal('${dateStr}', ${p.period})" class="p-2 text-center border-r border-slate-200 cursor-pointer transition relative h-16 ${cellClass}">
-                                <div class="flex flex-col justify-center h-full px-1">
-                                    ${content}
-                                </div>
-                            </td>
-                        `;
-                    });
-
-                    bodyHtml += `</tr>`;
-                });
-                body.innerHTML = bodyHtml;
-
-            } else {
-                // Daily View Mode
-                const dateStr = formatDate(state.currentDate);
-                dateDisplay.innerText = `${state.currentDate.getFullYear()}년 ${state.currentDate.getMonth() + 1}월 ${state.currentDate.getDate()}일`;
-
-                let headerHtml = `
-                    <th class="p-3 text-center border-r border-slate-200 bg-slate-100/70 w-28">교시 / 시간</th>
-                    <th class="p-3 text-center border-r border-slate-200">예약 및 수업 현황</th>
-                `;
-                header.innerHTML = headerHtml;
-
-                let bodyHtml = '';
-                const dayOfWeek = state.currentDate.getDay();
-
-                PERIOD_TIMES.forEach(p => {
-                    const fixed = state.fixedSchedules.find(f => f.roomId === state.selectedRoomId && f.dayOfWeek === dayOfWeek && f.period === p.period);
-                    const res = state.reservations.find(r => r.roomId === state.selectedRoomId && r.date === dateStr && r.period === p.period);
-
-                    let cellClass = "bg-white hover:bg-emerald-50/40 text-slate-400";
-                    let content = `<span class="text-sm text-emerald-600 font-semibold">+ Click하여 예약하기</span>`;
-
-                    if (fixed) {
-                        cellClass = "bg-amber-50 hover:bg-amber-100 text-amber-900 border-l-4 border-l-amber-500";
-                        content = `
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold text-sm">[고정 수업] ${fixed.subject}</span>
-                                <span class="text-xs bg-amber-200/80 px-2 py-1 rounded text-amber-900 font-semibold">${fixed.gradeClass}</span>
-                            </div>
-                        `;
-                    } else if (res) {
-                        cellClass = "bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-l-4 border-l-indigo-500";
-                        content = `
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <span class="font-bold text-sm">${res.purpose}</span>
-                                    <span class="text-xs text-indigo-600 ml-2">(${res.teacher} 선생님)</span>
-                                </div>
-                                <span class="text-xs bg-indigo-200/80 px-2 py-1 rounded text-indigo-900 font-semibold">${res.gradeClass}</span>
-                            </div>
-                        `;
-                    }
-
-                    bodyHtml += `
-                        <tr onclick="openSlotModal('${dateStr}', ${p.period})" class="cursor-pointer border-b border-slate-200 transition">
-                            <td class="p-3 text-center border-r border-slate-200 bg-slate-50/60">
-                                <div class="font-bold text-slate-800 text-sm">${p.name}</div>
-                                <div class="text-xs text-slate-400">${p.time}</div>
-                            </td>
-                            <td class="p-4 ${cellClass}">
-                                ${content}
-                            </td>
-                        </tr>
-                    `;
-                });
-                body.innerHTML = bodyHtml;
-            }
-
-            lucide.createIcons();
-        }
-
-        // --- DATE HELPER FUNCTIONS ---
-        function getWeekDates(d) {
-            const date = new Date(d);
-            const day = date.getDay();
-            const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-            const monday = new Date(date.setDate(diff));
-            
-            const week = [];
-            for (let i = 0; i < 5; i++) {
-                const nextDay = new Date(monday);
-                nextDay.setDate(monday.getDate() + i);
-                week.push(nextDay);
-            }
-            return week;
-        }
-
-        function formatDate(d) {
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-
-        function isSameDate(d1, d2) {
-            return formatDate(d1) === formatDate(d2);
-        }
-
-        function navigateDate(offset) {
-            if (state.viewMode === 'weekly') {
-                state.currentDate.setDate(state.currentDate.getDate() + (offset * 7));
-            } else {
-                state.currentDate.setDate(state.currentDate.getDate() + offset);
-            }
-            renderTimetable();
-        }
-
-        function navigateToday() {
-            state.currentDate = new Date();
-            renderTimetable();
-        }
-
-        function switchView(mode) {
-            state.viewMode = mode;
-            const weeklyBtn = document.getElementById('viewWeeklyBtn');
-            const dailyBtn = document.getElementById('viewDailyBtn');
-
-            if (mode === 'weekly') {
-                weeklyBtn.className = "px-3 py-1.5 rounded-lg transition text-white bg-indigo-600 shadow-xs";
-                dailyBtn.className = "px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900";
-            } else {
-                dailyBtn.className = "px-3 py-1.5 rounded-lg transition text-white bg-indigo-600 shadow-xs";
-                weeklyBtn.className = "px-3 py-1.5 rounded-lg transition text-slate-600 hover:text-slate-900";
-            }
-            renderTimetable();
-        }
-
-
-        // --- MODAL & RESERVATION HANDLERS ---
-        function openSlotModal(dateStr, period) {
-            const room = state.rooms.find(r => r.id === state.selectedRoomId);
-            const dateObj = new Date(dateStr);
-            const dayOfWeek = dateObj.getDay();
-
-            const fixed = state.fixedSchedules.find(f => f.roomId === state.selectedRoomId && f.dayOfWeek === dayOfWeek && f.period === period);
-            const res = state.reservations.find(r => r.roomId === state.selectedRoomId && r.date === dateStr && r.period === period);
-
-            document.getElementById('formRoomId').value = state.selectedRoomId;
-            document.getElementById('formRoomName').value = room ? room.name : '';
-            document.getElementById('formDate').value = dateStr;
-            document.getElementById('formPeriod').value = period;
-
-            document.getElementById('modalSubTitle').innerText = `${dateStr} | ${period}교시 (${PERIOD_TIMES[period - 1].time})`;
-
-            const occupiedNotice = document.getElementById('occupiedNotice');
-            const occupiedReason = document.getElementById('occupiedReason');
-            const submitBtn = document.getElementById('submitReservationBtn');
-            const cancelBtn = document.getElementById('cancelReservationBtn');
-            const durationContainer = document.getElementById('durationContainer');
-
-            document.getElementById('formTeacher').value = '';
-            document.getElementById('formGradeClass').value = '';
-            document.getElementById('formPurpose').value = '';
-            document.getElementById('formPassword').value = '';
-
-            if (fixed) {
-                occupiedNotice.classList.remove('hidden');
-                occupiedReason.innerText = `[고정 시간표] ${fixed.gradeClass} - ${fixed.subject}`;
-                submitBtn.classList.add('hidden');
-                cancelBtn.classList.add('hidden');
-                durationContainer.classList.add('hidden');
-                setFormDisabled(true);
-            } else if (res) {
-                occupiedNotice.classList.remove('hidden');
-                occupiedReason.innerText = `[기존 예약] ${res.teacher} 선생님 (${res.gradeClass}) - ${res.purpose}`;
-                
-                document.getElementById('formTeacher').value = res.teacher;
-                document.getElementById('formGradeClass').value = res.gradeClass;
-                document.getElementById('formPurpose').value = res.purpose;
-
-                submitBtn.classList.add('hidden');
-                cancelBtn.classList.remove('hidden');
-                durationContainer.classList.add('hidden');
-                setFormDisabled(true);
-                document.getElementById('formPassword').disabled = false;
-            } else {
-                occupiedNotice.classList.add('hidden');
-                submitBtn.classList.remove('hidden');
-                cancelBtn.classList.add('hidden');
-                durationContainer.classList.remove('hidden');
-                setFormDisabled(false);
-            }
-
-            openModal('reservationModal');
-        }
-
-        function setFormDisabled(disabled) {
-            document.getElementById('formTeacher').disabled = disabled;
-            document.getElementById('formGradeClass').disabled = disabled;
-            document.getElementById('formPurpose').disabled = disabled;
-        }
-
-        function handleReservationSubmit(e) {
-            e.preventDefault();
-            const roomId = document.getElementById('formRoomId').value;
-            const dateStr = document.getElementById('formDate').value;
-            const startPeriod = parseInt(document.getElementById('formPeriod').value);
-            const duration = parseInt(document.getElementById('formDuration').value);
-
-            const teacher = document.getElementById('formTeacher').value.trim();
-            const gradeClass = document.getElementById('formGradeClass').value.trim();
-            const purpose = document.getElementById('formPurpose').value.trim();
-            const password = document.getElementById('formPassword').value.trim();
-
-            const dateObj = new Date(dateStr);
-            const dayOfWeek = dateObj.getDay();
-
-            for (let i = 0; i < duration; i++) {
-                const targetPeriod = startPeriod + i;
-                if (targetPeriod > 8) {
-                    alert('8교시를 초과하여 예약할 수 없습니다.');
-                    return;
-                }
-
-                const fixed = state.fixedSchedules.find(f => f.roomId === roomId && f.dayOfWeek === dayOfWeek && f.period === targetPeriod);
-                const res = state.reservations.find(r => r.roomId === roomId && r.date === dateStr && r.period === targetPeriod);
-
-                if (fixed || res) {
-                    alert(`${targetPeriod}교시에 이미 기존 예약이나 고정 수업이 존재하여 연속 예약을 진행할 수 없습니다.`);
-                    return;
-                }
-            }
-
-            for (let i = 0; i < duration; i++) {
-                const newRes = {
-                    id: 'res-' + Date.now() + '-' + i,
-                    roomId: roomId,
-                    date: dateStr,
-                    period: startPeriod + i,
-                    teacher: teacher,
-                    gradeClass: gradeClass,
-                    purpose: purpose,
-                    isFixed: false,
-                    password: password,
-                    createdAt: new Date().toISOString()
-                };
-                state.reservations.push(newRes);
-            }
-
-            saveDataToLocal();
-            syncWithGoogleSheets();
-            closeModal('reservationModal');
-            renderTimetable();
-        }
-
-        function handleCancelReservation() {
-            const roomId = document.getElementById('formRoomId').value;
-            const dateStr = document.getElementById('formDate').value;
-            const period = parseInt(document.getElementById('formPeriod').value);
-            const inputPassword = document.getElementById('formPassword').value.trim();
-
-            const resIndex = state.reservations.findIndex(r => r.roomId === roomId && r.date === dateStr && r.period === period);
-            if (resIndex === -1) return;
-
-            const targetRes = state.reservations[resIndex];
-            if (targetRes.password && targetRes.password !== inputPassword) {
-                alert('비밀번호가 일치하지 않습니다.');
-                return;
-            }
-
-            if (confirm('정말로 이 예약을 취소하시겠습니까?')) {
-                state.reservations.splice(resIndex, 1);
-                saveDataToLocal();
-                syncWithGoogleSheets();
-                closeModal('reservationModal');
-                renderTimetable();
-            }
-        }
-
-
-        // --- FIXED SCHEDULE MANAGEMENT ---
-        function openFixedScheduleModal() {
-            renderFixedScheduleList();
-            openModal('fixedScheduleModal');
-        }
-
-        function handleFixedScheduleSubmit(e) {
-            e.preventDefault();
-            const dayOfWeek = parseInt(document.getElementById('fixedDay').value);
-            const period = parseInt(document.getElementById('fixedPeriod').value);
-            const gradeClass = document.getElementById('fixedGradeClass').value.trim();
-            const subject = document.getElementById('fixedSubject').value.trim();
-
-            const existingIndex = state.fixedSchedules.findIndex(f => f.roomId === state.selectedRoomId && f.dayOfWeek === dayOfWeek && f.period === period);
-            if (existingIndex !== -1) {
-                if (!confirm('해당 요일/교시에 이미 고정 수업이 설정되어 있습니다. 덮어쓰시겠습니까?')) {
-                    return;
-                }
-                state.fixedSchedules.splice(existingIndex, 1);
-            }
-
-            state.fixedSchedules.push({
-                id: 'fs-' + Date.now(),
-                roomId: state.selectedRoomId,
-                dayOfWeek: dayOfWeek,
-                period: period,
-                gradeClass: gradeClass,
-                subject: subject
-            });
-
-            saveDataToLocal();
-            syncWithGoogleSheets();
-            renderFixedScheduleList();
-            renderTimetable();
-
-            document.getElementById('fixedGradeClass').value = '';
-            document.getElementById('fixedSubject').value = '';
-        }
-
-        function deleteFixedSchedule(id) {
-            if (confirm('이 고정 시간표 항목을 삭제하시겠습니까?')) {
-                state.fixedSchedules = state.fixedSchedules.filter(f => f.id !== id);
-                saveDataToLocal();
-                syncWithGoogleSheets();
-                renderFixedScheduleList();
-                renderTimetable();
-            }
-        }
-
-        function renderFixedScheduleList() {
-            const container = document.getElementById('fixedScheduleList');
-            const roomSchedules = state.fixedSchedules.filter(f => f.roomId === state.selectedRoomId);
-
-            if (roomSchedules.length === 0) {
-                container.innerHTML = `<p class="text-xs text-slate-400 py-2">등록된 고정 시간표가 없습니다.</p>`;
-                return;
-            }
-
-            container.innerHTML = roomSchedules.map(f => `
-                <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs">
-                    <div>
-                        <span class="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded mr-2">${WEEKDAYS[f.dayOfWeek - 1]}요일 ${f.period}교시</span>
-                        <span class="font-semibold text-slate-800">${f.subject}</span>
-                        <span class="text-slate-500 ml-1">(${f.gradeClass})</span>
-                    </div>
-                    <button onclick="deleteFixedSchedule('${f.id}')" class="text-rose-500 hover:text-rose-700 p-1">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    </button>
-                </div>
-            `).join('');
-
-            lucide.createIcons();
-        }
-
-
-        // --- ROOM MANAGEMENT (ADD, EDIT, DELETE) ---
-        function openRoomManagementModal() {
-            resetRoomForm();
-            renderRoomList();
-            openModal('roomManagementModal');
-        }
-
-        function handleSaveRoom(e) {
-            e.preventDefault();
-            const editId = document.getElementById('editRoomId').value;
-            const name = document.getElementById('manageRoomName').value.trim();
-            const location = document.getElementById('manageRoomLocation').value.trim();
-            const capacity = document.getElementById('manageRoomCapacity').value.trim();
-            const equipment = document.getElementById('manageRoomEquipment').value.trim();
-
-            if (!name) return;
-
-            if (editId) {
-                // Update Existing Room
-                const room = state.rooms.find(r => r.id === editId);
-                if (room) {
-                    room.name = name;
-                    room.location = location;
-                    room.capacity = capacity;
-                    room.equipment = equipment;
-                }
-            } else {
-                // Add New Room
-                const newRoom = {
-                    id: 'room-' + Date.now(),
-                    name: name,
-                    location: location,
-                    capacity: capacity,
-                    equipment: equipment
-                };
-                state.rooms.push(newRoom);
-                state.selectedRoomId = newRoom.id;
-            }
-
-            saveDataToLocal();
-            syncWithGoogleSheets();
-            renderRoomSelect();
-            renderRoomList();
-            renderTimetable();
-            resetRoomForm();
-        }
-
-        function editRoom(id) {
-            const room = state.rooms.find(r => r.id === id);
-            if (!room) return;
-
-            document.getElementById('editRoomId').value = room.id;
-            document.getElementById('manageRoomName').value = room.name || '';
-            document.getElementById('manageRoomLocation').value = room.location || '';
-            document.getElementById('manageRoomCapacity').value = room.capacity || '';
-            document.getElementById('manageRoomEquipment').value = room.equipment || '';
-
-            document.getElementById('roomFormTitle').innerText = '특별실 정보 수정';
-            document.getElementById('saveRoomBtn').innerText = '수정 완료';
-            document.getElementById('cancelEditRoomBtn').classList.remove('hidden');
-        }
-
-        function resetRoomForm() {
-            document.getElementById('editRoomId').value = '';
-            document.getElementById('manageRoomName').value = '';
-            document.getElementById('manageRoomLocation').value = '';
-            document.getElementById('manageRoomCapacity').value = '';
-            document.getElementById('manageRoomEquipment').value = '';
-
-            document.getElementById('roomFormTitle').innerText = '새 특별실 등록';
-            document.getElementById('saveRoomBtn').innerText = '특별실 저장';
-            document.getElementById('cancelEditRoomBtn').classList.add('hidden');
-        }
-
-        function deleteRoom(id) {
-            if (state.rooms.length <= 1) {
-                alert('최소 하나 이상의 특별실이 필요합니다.');
-                return;
-            }
-
-            const room = state.rooms.find(r => r.id === id);
-            if (confirm(`'${room.name}' 특별실을 삭제하시겠습니까? 관련된 고정 시간표 및 예약 내역은 유지되거나 제외될 수 있습니다.`)) {
-                state.rooms = state.rooms.filter(r => r.id !== id);
-                if (state.selectedRoomId === id) {
-                    state.selectedRoomId = state.rooms[0].id;
-                }
-                saveDataToLocal();
-                syncWithGoogleSheets();
-                renderRoomSelect();
-                renderRoomList();
-                renderTimetable();
-            }
-        }
-
-        function renderRoomList() {
-            const container = document.getElementById('roomListContainer');
-            if (state.rooms.length === 0) {
-                container.innerHTML = `<p class="text-xs text-slate-400 py-2">등록된 특별실이 없습니다.</p>`;
-                return;
-            }
-
-            container.innerHTML = state.rooms.map(r => `
-                <div class="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs hover:border-indigo-200 transition">
-                    <div>
-                        <div class="font-bold text-slate-800 flex items-center gap-1.5">
-                            ${r.name}
-                            <span class="text-[10px] font-normal px-2 py-0.5 bg-slate-200 text-slate-600 rounded-full">${r.location || '위치미정'}</span>
-                        </div>
-                        <div class="text-slate-500 text-[11px] mt-0.5">
-                            수용: ${r.capacity || '-'} | 보유: ${r.equipment || '-'}
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-1">
-                        <button onclick="editRoom('${r.id}')" class="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-slate-200 rounded-lg transition" title="수정">
-                            <i data-lucide="edit-2" class="w-4 h-4"></i>
-                        </button>
-                        <button onclick="deleteRoom('${r.id}')" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-slate-200 rounded-lg transition" title="삭제">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                </div>
-            `).join('');
-            lucide.createIcons();
-        }
-
-
-        // --- SEARCH & EXPORT ---
-        function openSearchModal() {
-            filterSearchResults();
-            openModal('searchModal');
-        }
-
-        function filterSearchResults() {
-            const query = (document.getElementById('searchInput').value || '').toLowerCase();
-            const tbody = document.getElementById('searchResultsBody');
-
-            const filtered = state.reservations.filter(r => 
-                r.teacher.toLowerCase().includes(query) ||
-                r.gradeClass.toLowerCase().includes(query) ||
-                r.purpose.toLowerCase().includes(query)
-            );
-
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">검색 결과가 없습니다.</td></tr>`;
-                return;
-            }
-
-            tbody.innerHTML = filtered.map(r => {
-                const room = state.rooms.find(rm => rm.id === r.roomId);
-                return `
-                    <tr class="hover:bg-slate-50">
-                        <td class="p-3 font-mono">${r.date}</td>
-                        <td class="p-3 font-semibold">${room ? room.name : '미지정'}</td>
-                        <td class="p-3">${r.period}교시</td>
-                        <td class="p-3 font-semibold">${r.teacher}</td>
-                        <td class="p-3">${r.gradeClass}</td>
-                        <td class="p-3">${r.purpose}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
-        function exportToCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-            csvContent += "날짜,특별실,교시,담당교사,학급,수업목적\n";
-
-            state.reservations.forEach(r => {
-                const room = state.rooms.find(rm => rm.id === r.roomId);
-                const roomName = room ? room.name : '';
-                csvContent += `"${r.date}","${roomName}","${r.period}교시","${r.teacher}","${r.gradeClass}","${r.purpose}"\n`;
-            });
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `특별실_예약_내역_${formatDate(new Date())}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-
-        // --- SETTINGS & GOOGLE SHEETS BACKEND SYNC ---
-        function openSettingsModal() {
-            document.getElementById('gasUrlInput').value = state.gasUrl || '';
-            openModal('settingsModal');
-        }
-
-        async function syncWithGoogleSheets(forceFetch = false) {
-            if (!state.gasUrl) return;
-
-            try {
-                // Send current full state to Google Sheets backend
-                await fetch(state.gasUrl, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'saveAll',
-                        payload: {
-                            rooms: state.rooms,
-                            reservations: state.reservations,
-                            fixedSchedules: state.fixedSchedules
-                        }
-                    })
-                });
-
-                // Fetch full updated data from Sheets
-                if (forceFetch) {
-                    const response = await fetch(state.gasUrl + '?action=getAll');
-                    if (response.ok) {
-                        const remoteData = await response.json();
-                        if (remoteData && remoteData.rooms) {
-                            state.rooms = remoteData.rooms;
-                            state.reservations = remoteData.reservations || [];
-                            state.fixedSchedules = remoteData.fixedSchedules || [];
-                            saveDataToLocal();
-                            renderRoomSelect();
-                            renderTimetable();
-                        }
-                    }
-                }
-            } catch (err) {
-                console.warn('Google Sheets synchronization note:', err);
-            }
-        }
-
-
-        // --- MODAL HELPERS ---
-        function openModal(id) {
-            document.getElementById(id).classList.remove('hidden');
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).classList.add('hidden');
-        }
-    </script>
+        row += `<td onclick="openSlotModal('${ds}', ${p.period})" class="p-2 text-center border-r border-slate-200 cursor-pointer h-16 ${cls}"><div class="flex flex-col justify-center h-full px-1">${html}</div></td>`;
+      });
+      return row + '</tr>';
+    }).join('');
+
+  } else {
+    const ds = formatDate(state.currentDate), dow = state.currentDate.getDay();
+    disp.innerText = `${state.currentDate.getFullYear()}년 ${state.currentDate.getMonth() + 1}월 ${state.currentDate.getDate()}일`;
+    header.innerHTML = `<th class="p-3 text-center border-r border-slate-200 bg-slate-100/70 w-28">교시 / 시간</th><th class="p-3 text-center">예약 및 수업 현황</th>`;
+
+    body.innerHTML = PERIOD_TIMES.map(p => {
+      const fixed = findFixed(dow, p.period), res = findRes(ds, p.period);
+      let cls = 'bg-white hover:bg-emerald-50/40', html = `<span class="text-sm text-emerald-600 font-semibold">+ 클릭하여 예약하기</span>`;
+      if (fixed) {
+        cls = 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-l-4 border-l-amber-500';
+        html = `<div class="flex justify-between items-center"><span class="font-bold text-sm">[고정 수업] ${esc(fixed.subject)}</span>
+                <span class="text-xs bg-amber-200/80 px-2 py-1 rounded font-semibold">${esc(fixed.gradeClass)}</span></div>`;
+      } else if (res) {
+        cls = 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-l-4 border-l-indigo-500';
+        html = `<div class="flex justify-between items-center"><div><span class="font-bold text-sm">${esc(res.purpose)}</span>
+                <span class="text-xs text-indigo-600 ml-2">(${esc(res.teacher)} 선생님)</span></div>
+                <span class="text-xs bg-indigo-200/80 px-2 py-1 rounded font-semibold">${esc(res.gradeClass)}</span></div>`;
+      }
+      return `<tr onclick="openSlotModal('${ds}', ${p.period})" class="cursor-pointer border-b border-slate-200">
+        <td class="p-3 text-center border-r border-slate-200 bg-slate-50/60"><div class="font-bold text-slate-800 text-sm">${p.name}</div><div class="text-xs text-slate-400">${p.time}</div></td>
+        <td class="p-4 ${cls}">${html}</td></tr>`;
+    }).join('');
+  }
+  lucide.createIcons();
+}
+
+// ===================== 날짜 도우미 =====================
+function getWeekDates(d) {
+  const date = new Date(d), day = date.getDay();
+  const monday = new Date(date.setDate(date.getDate() - day + (day === 0 ? -6 : 1)));
+  return Array.from({ length: 5 }, (_, i) => { const n = new Date(monday); n.setDate(monday.getDate() + i); return n; });
+}
+function formatDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function isSameDate(a, b) { return formatDate(a) === formatDate(b); }
+function navigateDate(o) { state.currentDate.setDate(state.currentDate.getDate() + (state.viewMode === 'weekly' ? o * 7 : o)); renderTimetable(); }
+function navigateToday() { state.currentDate = new Date(); renderTimetable(); }
+function switchView(mode) {
+  state.viewMode = mode;
+  const on = 'px-3 py-1.5 rounded-lg text-white bg-indigo-600', off = 'px-3 py-1.5 rounded-lg text-slate-600';
+  document.getElementById('viewWeeklyBtn').className = mode === 'weekly' ? on : off;
+  document.getElementById('viewDailyBtn').className = mode === 'daily' ? on : off;
+  renderTimetable();
+}
+
+// ===================== 예약 =====================
+function openSlotModal(dateStr, period) {
+  const room = state.rooms.find(r => r.id === state.selectedRoomId);
+  const dow = new Date(dateStr + 'T00:00:00').getDay();
+  const fixed = findFixed(dow, period), res = findRes(dateStr, period);
+
+  document.getElementById('formRoomId').value = state.selectedRoomId;
+  document.getElementById('formRoomName').value = room ? room.name : '';
+  document.getElementById('formDate').value = dateStr;
+  document.getElementById('formPeriod').value = period;
+  document.getElementById('modalSubTitle').innerText = `${dateStr} | ${period}교시 (${PERIOD_TIMES[period - 1].time})`;
+
+  const notice = document.getElementById('occupiedNotice'), reason = document.getElementById('occupiedReason');
+  const submitBtn = document.getElementById('submitReservationBtn'), cancelBtn = document.getElementById('cancelReservationBtn');
+  const dur = document.getElementById('durationContainer');
+
+  ['formTeacher', 'formGradeClass', 'formPurpose', 'formPassword'].forEach(id => document.getElementById(id).value = '');
+
+  if (fixed) {
+    notice.classList.remove('hidden'); reason.innerText = `[고정 시간표] ${fixed.gradeClass} - ${fixed.subject}`;
+    submitBtn.classList.add('hidden'); cancelBtn.classList.add('hidden'); dur.classList.add('hidden');
+    setFormDisabled(true); document.getElementById('formPassword').disabled = true;
+  } else if (res) {
+    notice.classList.remove('hidden'); reason.innerText = `[기존 예약] ${res.teacher} 선생님 (${res.gradeClass}) - ${res.purpose}`;
+    document.getElementById('formTeacher').value = res.teacher;
+    document.getElementById('formGradeClass').value = res.gradeClass;
+    document.getElementById('formPurpose').value = res.purpose;
+    submitBtn.classList.add('hidden'); cancelBtn.classList.remove('hidden'); dur.classList.add('hidden');
+    setFormDisabled(true); document.getElementById('formPassword').disabled = false;
+  } else {
+    notice.classList.add('hidden'); submitBtn.classList.remove('hidden'); cancelBtn.classList.add('hidden'); dur.classList.remove('hidden');
+    setFormDisabled(false); document.getElementById('formPassword').disabled = false;
+  }
+  openModal('reservationModal');
+}
+
+function setFormDisabled(v) { ['formTeacher', 'formGradeClass', 'formPurpose'].forEach(id => document.getElementById(id).disabled = v); }
+
+async function handleReservationSubmit(e) {
+  e.preventDefault();
+  const roomId = document.getElementById('formRoomId').value;
+  const date = document.getElementById('formDate').value;
+  const start = parseInt(document.getElementById('formPeriod').value);
+  const duration = parseInt(document.getElementById('formDuration').value);
+  const teacher = document.getElementById('formTeacher').value.trim();
+  const gradeClass = document.getElementById('formGradeClass').value.trim();
+  const purpose = document.getElementById('formPurpose').value.trim();
+  const password = document.getElementById('formPassword').value.trim();
+
+  if (start + duration - 1 > 8) { alert('8교시를 초과하여 예약할 수 없습니다.'); return; }
+  const items = [];
+  for (let i = 0; i < duration; i++) items.push({ roomId, date, period: start + i, teacher, gradeClass, purpose, password });
+  if (await mutate('addReservations', { items })) closeModal('reservationModal');
+}
+
+async function handleCancelReservation() {
+  const roomId = document.getElementById('formRoomId').value;
+  const date = document.getElementById('formDate').value;
+  const period = parseInt(document.getElementById('formPeriod').value);
+  const password = document.getElementById('formPassword').value.trim();
+  if (!confirm('정말로 이 예약을 취소하시겠습니까?')) return;
+  if (await mutate('cancelReservation', { roomId, date, period, password })) closeModal('reservationModal');
+}
+
+// ===================== 고정 시간표 =====================
+function openFixedScheduleModal() { renderFixedScheduleList(); openModal('fixedScheduleModal'); }
+
+async function handleFixedScheduleSubmit(e) {
+  e.preventDefault();
+  const dayOfWeek = parseInt(document.getElementById('fixedDay').value);
+  const period = parseInt(document.getElementById('fixedPeriod').value);
+  const gradeClass = document.getElementById('fixedGradeClass').value.trim();
+  const subject = document.getElementById('fixedSubject').value.trim();
+
+  const existing = findFixed(dayOfWeek, period);
+  if (existing && !confirm('해당 요일/교시에 이미 고정 수업이 있습니다. 덮어쓰시겠습니까?')) return;
+
+  const item = { id: existing ? existing.id : 'fs-' + Date.now(), roomId: state.selectedRoomId, dayOfWeek, period, gradeClass, subject };
+  if (await mutate('saveFixed', { item })) {
+    renderFixedScheduleList();
+    document.getElementById('fixedGradeClass').value = '';
+    document.getElementById('fixedSubject').value = '';
+  }
+}
+
+async function deleteFixedSchedule(id) {
+  if (!confirm('이 고정 시간표 항목을 삭제하시겠습니까?')) return;
+  if (await mutate('deleteFixed', { id })) renderFixedScheduleList();
+}
+
+function renderFixedScheduleList() {
+  const box = document.getElementById('fixedScheduleList');
+  const list = state.fixedSchedules.filter(f => f.roomId === state.selectedRoomId);
+  if (!list.length) { box.innerHTML = `<p class="text-xs text-slate-400 py-2">등록된 고정 시간표가 없습니다.</p>`; return; }
+  box.innerHTML = list.map(f => `
+    <div class="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs">
+      <div><span class="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded mr-2">${WEEKDAYS[f.dayOfWeek - 1]}요일 ${f.period}교시</span>
+      <span class="font-semibold text-slate-800">${esc(f.subject)}</span><span class="text-slate-500 ml-1">(${esc(f.gradeClass)})</span></div>
+      <button onclick="deleteFixedSchedule('${esc(f.id)}')" class="text-rose-500 hover:text-rose-700 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+    </div>`).join('');
+  lucide.createIcons();
+}
+
+// ===================== 특별실 관리 =====================
+function openRoomManagementModal() { resetRoomForm(); renderRoomList(); openModal('roomManagementModal'); }
+
+async function handleSaveRoom(e) {
+  e.preventDefault();
+  const editId = document.getElementById('editRoomId').value;
+  const room = {
+    id: editId || 'room-' + Date.now(),
+    name: document.getElementById('manageRoomName').value.trim(),
+    location: document.getElementById('manageRoomLocation').value.trim(),
+    capacity: document.getElementById('manageRoomCapacity').value.trim(),
+    equipment: document.getElementById('manageRoomEquipment').value.trim()
+  };
+  if (!room.name) return;
+  if (!editId) state.selectedRoomId = room.id;
+  if (await mutate('saveRoom', { room })) { saveDataToLocal(); renderRoomList(); resetRoomForm(); }
+}
+
+function editRoom(id) {
+  const r = state.rooms.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('editRoomId').value = r.id;
+  document.getElementById('manageRoomName').value = r.name || '';
+  document.getElementById('manageRoomLocation').value = r.location || '';
+  document.getElementById('manageRoomCapacity').value = r.capacity || '';
+  document.getElementById('manageRoomEquipment').value = r.equipment || '';
+  document.getElementById('roomFormTitle').innerText = '특별실 정보 수정';
+  document.getElementById('saveRoomBtn').innerText = '수정 완료';
+  document.getElementById('cancelEditRoomBtn').classList.remove('hidden');
+}
+
+function resetRoomForm() {
+  ['editRoomId', 'manageRoomName', 'manageRoomLocation', 'manageRoomCapacity', 'manageRoomEquipment'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('roomFormTitle').innerText = '새 특별실 등록';
+  document.getElementById('saveRoomBtn').innerText = '특별실 저장';
+  document.getElementById('cancelEditRoomBtn').classList.add('hidden');
+}
+
+async function deleteRoom(id) {
+  if (state.rooms.length <= 1) { alert('최소 하나 이상의 특별실이 필요합니다.'); return; }
+  const room = state.rooms.find(r => r.id === id);
+  if (!confirm(`'${room.name}' 특별실을 삭제하시겠습니까?`)) return;
+  if (await mutate('deleteRoom', { id })) renderRoomList();
+}
+
+function renderRoomList() {
+  const box = document.getElementById('roomListContainer');
+  if (!state.rooms.length) { box.innerHTML = `<p class="text-xs text-slate-400 py-2">등록된 특별실이 없습니다.</p>`; return; }
+  box.innerHTML = state.rooms.map(r => `
+    <div class="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+      <div><div class="font-bold text-slate-800 flex items-center gap-1.5">${esc(r.name)}
+        <span class="text-[10px] font-normal px-2 py-0.5 bg-slate-200 text-slate-600 rounded-full">${esc(r.location) || '위치미정'}</span></div>
+        <div class="text-slate-500 text-[11px] mt-0.5">수용: ${esc(r.capacity) || '-'} | 보유: ${esc(r.equipment) || '-'}</div></div>
+      <div class="flex items-center space-x-1">
+        <button onclick="editRoom('${esc(r.id)}')" class="p-1.5 text-slate-500 hover:text-indigo-600 rounded-lg" title="수정"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+        <button onclick="deleteRoom('${esc(r.id)}')" class="p-1.5 text-slate-500 hover:text-rose-600 rounded-lg" title="삭제"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+      </div>
+    </div>`).join('');
+  lucide.createIcons();
+}
+
+// ===================== 검색 & CSV =====================
+function openSearchModal() { filterSearchResults(); openModal('searchModal'); }
+
+function filterSearchResults() {
+  const q = (document.getElementById('searchInput').value || '').toLowerCase();
+  const tbody = document.getElementById('searchResultsBody');
+  const list = state.reservations.filter(r => [r.teacher, r.gradeClass, r.purpose].some(v => String(v).toLowerCase().includes(q)));
+  if (!list.length) { tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">검색 결과가 없습니다.</td></tr>`; return; }
+  tbody.innerHTML = list.map(r => {
+    const room = state.rooms.find(x => x.id === r.roomId);
+    return `<tr class="hover:bg-slate-50"><td class="p-3 font-mono">${esc(r.date)}</td><td class="p-3 font-semibold">${room ? esc(room.name) : '미지정'}</td>
+      <td class="p-3">${r.period}교시</td><td class="p-3 font-semibold">${esc(r.teacher)}</td><td class="p-3">${esc(r.gradeClass)}</td><td class="p-3">${esc(r.purpose)}</td></tr>`;
+  }).join('');
+}
+
+function exportToCSV() {
+  const q = s => `"${String(s ?? '').replace(/"/g, '""')}"`;
+  let csv = '\uFEFF날짜,특별실,교시,담당교사,학급,수업목적\n';
+  state.reservations.forEach(r => {
+    const room = state.rooms.find(x => x.id === r.roomId);
+    csv += [q(r.date), q(room ? room.name : ''), q(r.period + '교시'), q(r.teacher), q(r.gradeClass), q(r.purpose)].join(',') + '\n';
+  });
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = `특별실_예약_내역_${formatDate(new Date())}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ===================== 설정 / 모달 =====================
+function openSettingsModal() { document.getElementById('gasUrlInput').value = state.gasUrl || ''; openModal('settingsModal'); }
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+</script>
 </body>
 </html>
